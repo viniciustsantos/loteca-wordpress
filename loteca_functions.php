@@ -1,5 +1,5 @@
 <?php
-
+// TESTE de versionamento no github
 function loteca_ativar_hook() {
   // Vamos criar um opção para ser guardada na base-de-dados
   // e incluir um valor por defeito.
