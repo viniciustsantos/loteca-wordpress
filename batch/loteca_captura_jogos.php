@@ -1,5 +1,7 @@
 <?php
 
+include_once 'loteca_geral.php';
+
 function busca_info_ult_rodada(){
 	$sql="SELECT rodada, dt_sorteio FROM `wp_loteca_rodada` where rodada = (select max(rodada) from  `wp_loteca_rodada`)";
 	$result=query($sql);
@@ -296,7 +298,6 @@ function captura_cef(){
 	}
 }
 
-include_once 'loteca_geral.php';
 prepara_ambiente();
 $hora = date("Y-m-d H:i:s");
 echo "##################################### " . $hora . " #####################################\n";

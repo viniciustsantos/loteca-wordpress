@@ -412,6 +412,7 @@ function cria_globals(){ // OK
 
 function config_conexao_mysql(){ // OK
  global $mysql_host, $mysql_user, $mysql_password, $mysql_dbname, $link;
+ // VERIFICA SE A CHAMADA ESTA SENDO SOLICITADA VIA PAGINA DO WORDPRESS E CAPTURA OS DADOS DA CONEXAO
  if(file_exists('conf/loteca.conf.php')){
   include('conf/loteca.conf.php');
  }else{
@@ -485,10 +486,15 @@ function query($sql){
 
 function conecta(){
 	global $mysql_host, $mysql_user, $mysql_password , $mysql_dbname, $mysql_link;
+	global $wpdb;
 	if (!is_object($mysql_link)){
-		if (!$mysql_link = mysqli_connect($mysql_host, $mysql_user, $mysql_password , $mysql_dbname)) {
-			gr_l("Não foi possível conectar ao mysql! $mysql_host $mysql_user $mysql_password $mysql_dbname");
-			return FALSE;
+		if(isset($wpdb->dbh)){
+			$mysql_link = $wpdb->dbh;
+		}else
+			if (!$mysql_link = mysqli_connect($mysql_host, $mysql_user, $mysql_password , $mysql_dbname)) {
+				gr_l("Não foi possível conectar ao mysql! $mysql_host $mysql_user $mysql_password $mysql_dbname");
+				return FALSE;
+			}
 		}
 	}
 	return TRUE;
