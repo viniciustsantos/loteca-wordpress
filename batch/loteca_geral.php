@@ -415,11 +415,13 @@ function config_conexao_mysql(){ // OK
  if(file_exists('conf/loteca.conf.php')){
   include('conf/loteca.conf.php');
  }else{
-//  $mysql_host='7nerds.com.br';
+/*
+informe os dados do servidor, user, password e dbname
+*/
   $mysql_host='localhost';
-  $mysql_user='hg7ne213_wp699';
-  $mysql_password='PrH554S.2)';
-  $mysql_dbname='hg7ne213_wp699';
+  $mysql_user='';
+  $mysql_password='';
+  $mysql_dbname='';
  }
 }
 
