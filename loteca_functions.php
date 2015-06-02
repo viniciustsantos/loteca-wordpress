@@ -45,6 +45,7 @@ function loteca_options() {
 //	$result.="&nbsp;<input name='novarodada' class='loteca button-primary' type='submit' " . SUBMITDISABLED . " value='Cadastrar nova rodada' />";
 //	$result.="&nbsp;<input name='novogrupo' class='loteca button-primary' type='submit' " . SUBMITDISABLED . " value='Cadastrar novo grupo' />";
 	$result.="&nbsp;<input name='alterarparametro' class='loteca button-primary' type='submit' " . SUBMITDISABLED . " value='Alterar parametros gerais' />";
+	$result.="&nbsp;<input name='capturacef' class='loteca button-primary' type='submit' " . SUBMITDISABLED . " value='Capturar dados da CEF' />";
 	$result.="</form></div>";
 	$result.='</div>';
 	$listar=TRUE;
@@ -71,6 +72,11 @@ function loteca_options() {
 	if(isset($_POST['alterarparametro'])){
 		$result.=alterar_parametros();
 		$listar=FALSE;
+	}
+	if(isset($_POST['capturacef'])){
+		include_once 'loteca_captura.php';
+		$result.=loteca_captura();
+		$listar=TRUE;
 	}
 	if(isset($_POST['submeternovosparametros'])){
 		$result.=submeter_parametros();
@@ -507,6 +513,14 @@ function shortcode_loteca($atts, $content = NULL){
 		$result.="<P>FAÇA SEU <a href='".wp_login_url()."'>LOGIN</a> E ACESSE OS BOLÕES QUE VOCÊ ESTÁ PARTICIPANDO OU ADMINISTRA.</P>";
 		$result.=msg_rodape();
 		return $result;
+	}
+	if(isset($_POST['registrarpalpite'])){
+		$id_grupo=$_POST['grupo'];
+		if( !loteca_acessa_grupo($id_grupo) ){
+			$result.="OCORREU UM ERRO. TENTE NOVAMENTE EM ALGUNS INSTANTES.";
+			return $result;
+		}
+		return acessagrupo($id_grupo) . registrarpalpite($id_grupo) . msg_rodape();
 	}
 	if(isset($_POST['palpitar'])){
 		$id_grupo=$_POST['grupo'];
@@ -1866,10 +1880,17 @@ function acessagrupo($id_grupo){
 	$result.="</TABLE>";
 	return $result;
 }
+
 function palpitar($id_grupo){
  $result='';
  $jogos=carrega_jogos_palpitar();
  if($jogos){
+	foreach($jogos as $jogo){
+		$rodada=$jogo->rodada;
+		break;
+	}
+	$user=get_current_user_id();
+	$palpites_temp=le_palpites($id_grupo,$rodada,$user);
 	$result.="\n<script type='text/javascript'>";
 	$result.="\n function atualiza_jogo(){";
 	$result.="\n  lista = [ 'XX', 'S:13 D:1 T:0' ,
@@ -1977,7 +1998,8 @@ function palpitar($id_grupo){
 	$result.="<TD>";
 	$result.="<form method='POST'>";
 	$result.="<input name=grupo type=hidden value=" . $id_grupo .">";
-	$result.="<input name=user type=hidden value=" . get_current_user_id() .">";
+	$result.="<input name=rodada type=hidden value=" . $rodada .">";
+	$result.="<input name=user type=hidden value=" . $user .">";
 	$result.="<input name=palpites type=hidden value=PALPITES>";
 	$result.="<TABLE class='minimo'>";
 	$result.="<TR>";
@@ -2003,6 +2025,11 @@ function palpitar($id_grupo){
 	$result.="DIA";
 	$result.="</TH>";
 	$result.="</TR>";
+	foreach($palpites_temp as $palpite){
+		$palpites[$palpite['seq']]['1']=$palpite['time1'];
+		$palpites[$palpite['seq']]['X']=$palpite['empate'];
+		$palpites[$palpite['seq']]['2']=$palpite['time2'];
+	}
 	foreach($jogos as $jogo){
 		$result.="<TR><TD>";
 		$result.=$jogo->seq;
@@ -2011,13 +2038,25 @@ function palpitar($id_grupo){
 		$result.=$jogo->time1;
 		$result.="</TD>";
 		$result.="<TD>";
-		$result.="<input id='" . $jogo->seq . "-1' name='" . $jogo->seq . "-1' type=checkbox autofocus onchange='atualiza_jogo()'>";
+		$result.="<input id='" . $jogo->seq . "-1' name='" . $jogo->seq . "-1' type=checkbox autofocus onchange='atualiza_jogo()'";
+		if($palpites[$jogo->seq]['1']){
+			$result.=" checked ";
+		}
+		$result.=">";
 		$result.="</TD>";
 		$result.="<TD>";
-		$result.="<input id='" . $jogo->seq . "-X' name='" . $jogo->seq . "-X' type=checkbox onchange='atualiza_jogo()'>";
+		$result.="<input id='" . $jogo->seq . "-X' name='" . $jogo->seq . "-X' type=checkbox onchange='atualiza_jogo()'";
+		if($palpites[$jogo->seq]['X']){
+			$result.=" checked ";
+		}
+		$result.=">";
 		$result.="</TD>";
 		$result.="<TD>";
-		$result.="<input id='" . $jogo->seq . "-2' name='" . $jogo->seq . "-2' type=checkbox onchange='atualiza_jogo()'>";
+		$result.="<input id='" . $jogo->seq . "-2' name='" . $jogo->seq . "-2' type=checkbox onchange='atualiza_jogo()'";
+		if($palpites[$jogo->seq]['2']){
+			$result.=" checked ";
+		}
+		$result.=">";
 		$result.="</TD>";
 		$result.="<TD>";
 		$result.=$jogo->time2;
@@ -2090,12 +2129,59 @@ function palpitar($id_grupo){
 	$result.="</TR>";
 	$result.="</TABLE>";
 	$result.="</div>";
+	$result.="<script type='text/javascript'>\natualiza_jogo();\n</script>";
  }else{
 	$result.="<H3>NÃO HÁ JOGOS PARA FAZER PALPITES!</H3>";
  }
  
  return $result;
 
+}
+
+function le_palpites($id_grupo,$rodada,$user){
+	global $wpdb;
+	$result=$wpdb->get_results("
+	SELECT * FROM " . $wpdb->prefix . "loteca_palpite 
+	WHERE id_grupo = " . $id_grupo . " AND id_user = " . $user . " AND rodada = " . $rodada . " ORDER BY seq;", ARRAY_A );
+	return $result;
+}
+
+function registrarpalpite($id_grupo){
+	global $wpdb;
+	$result='';
+	$rodada=$_POST['rodada'];
+	if(isset($_POST['user'])){
+		$user=$_POST['user'];
+	}else{
+		$user=get_current_user_id();
+	}
+	$querys=array();
+	for($seq=1;$seq<=14;$seq++){
+		if(($_POST[$seq . '-1'])||($_POST[$seq . '-X'])||($_POST[$seq . '-2'])){
+			$querys[]=$wpdb->prepare("
+			REPLACE INTO " . $wpdb->prefix . "loteca_palpite ( rodada , seq , id_grupo , id_user , time1 , empate , time2 ) 
+			VALUES ( %s , %s , %s , %s , %s , %s , %s )",
+			 $rodada , $seq  , $id_grupo , $user , $_POST[$seq . '-1']?'1':'0' , $_POST[$seq . '-X']?'1':'0' , $_POST[$seq . '-2']?'1':'0' );
+		}
+	}
+	if(count($querys)==14){
+		@mysql_query("BEGIN", $wpdb->dbh);
+		foreach($querys as $query){
+			$wpdb->query($query);
+		}
+		if ($error) {
+    // Error occured, don't save any changes
+			@mysql_query("ROLLBACK", $wpdb->dbh);
+			$result.="PROBLEMAS AO TENTAR REGISTRAR OS PALPITES, TENTE MAIS TARDE (ERRO BANCO DE DADOS).";
+		} else {
+   // All ok, save the changes
+			@mysql_query("COMMIT", $wpdb->dbh);
+			$result.="PALPITES REGISTRADOS COM SUCESSO.";
+		}
+	}else{
+		$result.="PROBLEMAS AO TENTAR REGISTRAR OS PALPITES, TENTE MAIS TARDE (PARAMETROS INVÁLIDOS).";
+	}
+	return $result;
 }
 
 function carrega_jogos_palpitar(){

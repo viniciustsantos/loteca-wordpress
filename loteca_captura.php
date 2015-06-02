@@ -1,4 +1,3 @@
-#!/opt/php55/lib/php
 <?php
 
 include_once 'loteca_geral.php';
@@ -15,6 +14,10 @@ function captura_programacao(){
 	$proxy=false;
 // busca pagina HTML da programacao da loteca
 	$html = file_get_contents_curl('http://www.loterias.caixa.gov.br/wps/portal/loterias/landing/loteca/programacao/');
+	if(!$html){
+		echo '<BR>Erro em file_get_contents_curl<BR>';
+		return FALSE;
+	}
 // carrega HTML da programação como DOMDocument para tratamento das informações
 	$doc = new DOMDocument();
 	libxml_use_internal_errors(true);
@@ -31,11 +34,8 @@ function captura_programacao(){
 	}
 
 	if (!$indisponivel){
-//		echo "\nDOCUMENTO CARREGADO\n";
 		$querys=array();
 		$resultados=$doc->getElementById('resultados');
-//	echo $doc->saveHTML($resultados);
-//		echo "\nELEMENTO CARREGADO\n";
 // CAPTURA INFORMAÇÃO DO CONCURSO
 		$infos=$resultados->getElementsByTagName('small');
 		foreach($infos as $info){
@@ -46,7 +46,8 @@ function captura_programacao(){
 			$concurso=$array[0];
 			$inicio=date("Y-m-d",strtotime("previous monday", $dia));
 			$fim=date("Y-m-d",strtotime("previous friday", $dia));
-			$dia_sql=DateTime::createFromFormat("Y-m-d", $array[1])->getTimestamp();
+//			$dia_sql=DateTime::createFromFormat('Y-m-d', $array[1])->getTimestamp();
+			$dia_sql=date("Y-m-d",$dia);
 			$querys[]="
 			INSERT INTO wp_loteca_rodada ( rodada , dt_inicio_palpite , dt_fim_palpite , dt_sorteio ) 
 			VALUES ( " . $concurso ." , '" . $inicio . " 00:00:00' , '" . $fim . " 18:00:00' , '" . $dia_sql . "');\n";			
@@ -63,7 +64,8 @@ function captura_programacao(){
 			$qt_col=0;
 			$seq=0;
 			foreach($colunas as $coluna){
-				$texto=utf8_decode(trim($coluna->nodeValue));
+//				$texto=utf8_decode(trim($coluna->nodeValue));
+				$texto=trim($coluna->nodeValue);
 				if(strlen($texto)<=2){
 					if(ord(substr($texto,0,1))>48&&ord(substr($texto,0,1))<58){
 						$seq=intval($texto);
@@ -105,18 +107,27 @@ function captura_programacao(){
 		}
 		query($querys);
 	}
+	return TRUE;
 }
 
-function captura_resultado() {
+function captura_resultado_cef() {
 	$pendente=busca_resultado_pendente();
 	if($pendente!=0){
 		$resultado_cef=le_pagina_resultados();
+		if(!$resultado_cef){
+			echo "Erro em le_pagina_resultados\n $resultado_cef";
+			return FALSE;
+		}
 		switch($resultado_cef['CONCURSO']){
 			case -1:
-				echo "ERRO NA CAPTURA DOS DADOS NA PAGINA DE RESULTADOS DA CEF\n"; 
+				echo 'Erro em le_pagina_resultados -1';
+				return FALSE;
+//				echo "ERRO NA CAPTURA DOS DADOS NA PAGINA DE RESULTADOS DA CEF\n"; 
 				break;
 			case 0:
-				echo "PROBLEMAS NO ACESSO AOS DADOS DA PAGINA DE RESULTADOS DA CEF\n"; 
+				echo 'Erro em le_pagina_resultados 0';
+				return FALSE;
+//				echo "PROBLEMAS NO ACESSO AOS DADOS DA PAGINA DE RESULTADOS DA CEF\n"; 
 				break;
 			case $pendente:
 				$concurso=$resultado_cef['CONCURSO'];
@@ -144,17 +155,24 @@ function captura_resultado() {
 					foreach($querys as $query){
 						query($query);
 					}
-					echo "Capturado resultado do concurso " . $concurso . ".\n";
+					echo 'Incluidas as informações de resultado\n';
+					return TRUE;
+//					echo "Capturado resultado do concurso " . $concurso . ".\n";
 				}else{
-					echo "PROBLEMAS NO TRATAMENTO DAS INFORMAÇÕES RECEBIDAS DA PÁGINA DE RESULTADOS DA CEF;\n";
+					echo 'Erro na interpretacao dos dados da pagina';
+					return FALSE;
+//					echo "PROBLEMAS NO TRATAMENTO DAS INFORMAÇÕES RECEBIDAS DA PÁGINA DE RESULTADOS DA CEF;\n";
 				}
 				break;
 			default:
-				echo "Resultado esperado do concurso " . $pendente . " e o disponível na CEF é " . $resultado_cef['CONCURSO'] . "\n"; 
+				echo 'Erro em resultado na pagina diferente do esperado\n';
+				return FALSE;
+//				echo "Resultado esperado do concurso " . $pendente . " e o disponível na CEF é " . $resultado_cef['CONCURSO'] . "\n"; 
 				break;
 		}
 	}else{
-		echo "Nenhum resultado pendente de captura.\n";
+		return TRUE;
+//		echo "Nenhum resultado pendente de captura.\n";
 	}
 }
 
@@ -164,7 +182,7 @@ function busca_resultado_pendente(){
 	while ($row = mysqli_fetch_assoc($result)) {
 		return intval($row['rodada']);
 	}
-	return 0;
+	return FALSE;
 }
 
 function le_pagina_resultados(){
@@ -175,6 +193,10 @@ function le_pagina_resultados(){
 											 13 => 0 , 14 => 0);
 // busca pagina HTML da programacao da loteca
 	$html = file_get_contents_curl('http://www.loterias.caixa.gov.br/wps/portal/loterias/landing/loteca/');
+	if(!$html){
+		echo "Erro em file_get_contents_curl\n";
+		return FALSE;
+	}
 // carrega HTML da programação como DOMDocument para tratamento das informações
 	$doc = new DOMDocument();
 	libxml_use_internal_errors(true);
@@ -204,7 +226,11 @@ function le_pagina_resultados(){
 				$retirar=array("R$ ", "Concurso ","(",")",",");
 				$array=explode(" ", str_replace($retirar, "", $texto));
 				if(count($array)==2){
+					echo "<BR>ARRAY ENCONTRADO:<BR>";
+					var_dump($array);
+					echo "<BR>";
 					$info_resultados['CONCURSO']=$array[0];
+					break 2;
 				}
 			}
 		}
@@ -241,6 +267,7 @@ function le_pagina_resultados(){
 				}
 			}
 			if($qt_sel<>1){
+				echo "Erro em $qt_sel<>1\n";
 				$erro=TRUE;
 			}
 		}
@@ -248,7 +275,10 @@ function le_pagina_resultados(){
 	if(!$erro){
 		foreach($info_resultados as $valor){
 			if($valor==0){
+				echo "Erro em $valor==0\n";
+				var_dump($info_resultados);
 				$erro=TRUE;
+				break;
 			}
 		}
 	}
@@ -279,13 +309,19 @@ function file_get_contents_curl($url) {
 	curl_setopt($ch, CURLOPT_FRESH_CONNECT, 1);
 	curl_setopt($ch, CURLOPT_COOKIEJAR, 'cookies.txt'); 
     $data = curl_exec($ch);
-	if(curl_errno($ch)){echo 'ERRO: ' . curl_errno($ch) . " -> " . curl_error($ch) ;}
+	if(curl_errno($ch)){
+		return FALSE;
+//		echo 'ERRO: ' . curl_errno($ch) . " -> " . curl_error($ch) ;
+	}
     curl_close($ch);
     return $data;
 }
 
 function captura_cef(){
-	captura_resultado();
+	if (!captura_resultado_cef()){
+		echo 'Erro em captura_resultado_cef';
+		return FALSE;
+	};
 	$info_ult_rodada=busca_info_ult_rodada();
 	$rodada=$info_ult_rodada['rodada'];
 	$rodada++;
@@ -293,18 +329,27 @@ function captura_cef(){
 	$dia=DateTime::createFromFormat('Y-m-d H:i:s', $dt_sorteio . " 18:00:00")->getTimestamp();
 	$hoje=time();
 	if ($dia<=$hoje){
-		captura_programacao($rodada);
+		if(!captura_programacao($rodada)){
+			echo '<BR>Erro em captura_programacao<BR>';
+			return FALSE;
+		}
 	}else{
-		echo "# Aguardando prazo para captura da programação " . $rodada . ". (" . date("Y-m-d H:i:s",$dia) . ">" . date("Y-m-d H:i:s",$hoje) . ") #\n";
+		echo 'Erro em $dia<=$hoje';
+		return FALSE;
+//		echo "# Aguardando prazo para captura da programação " . $rodada . ". (" . date("Y-m-d H:i:s",$dia) . ">" . date("Y-m-d H:i:s",$hoje) . ") #\n";
 	}
+	return TRUE;
 }
 
+function loteca_captura(){
 prepara_ambiente();
-$hora = date("Y-m-d H:i:s");
-echo "##################################### " . $hora . " #####################################\n";
-echo " VERSÃO DO PHP : " . phpversion() . "\n";
 config_conexao_mysql();
-captura_cef();
-$hora = date("Y-m-d H:i:s");
-echo "##################################### " . $hora . " #####################################\n";
+if(!captura_cef()){
+	return "NÃO FOI POSSÍVEL VERIFICAR/CAPTURAR RESULTADO E PROGRAMAÇÃO DO SITE DA CEF";
+}else{
+	return "JOGOS CAPTURADOS";
+}
+;
+	
+}
 ?>

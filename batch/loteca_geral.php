@@ -465,7 +465,9 @@ function query($sql){
 		$result=FALSE;
 		grava_err_sql($sql);
 	}else{
-		$mysql_link->begin_transaction();
+		if(version_compare(phpversion(),'5.5.0')>=0){
+			$mysql_link->begin_transaction();
+		}
 		if(!is_array($sql)){
 			$result = $mysql_link->query($sql);
 		}else{
@@ -490,7 +492,7 @@ function conecta(){
 	if (!is_object($mysql_link)){
 		if(isset($wpdb->dbh)){
 			$mysql_link = $wpdb->dbh;
-		}else
+		}else{
 			if (!$mysql_link = mysqli_connect($mysql_host, $mysql_user, $mysql_password , $mysql_dbname)) {
 				gr_l("Não foi possível conectar ao mysql! $mysql_host $mysql_user $mysql_password $mysql_dbname");
 				return FALSE;
@@ -502,6 +504,7 @@ function conecta(){
 
 function gr_l($linhas){
 	global $arquivo_log,$h_log;
+	if(!isset($arquivo_log)){echo "<BR>LINHAS: $linhas<BR>";}
 	if(!is_resource($h_log)){
 		$h_log=fopen($arquivo_log,'a');
 	}
