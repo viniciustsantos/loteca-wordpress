@@ -613,7 +613,7 @@ function shortcode_loteca($atts, $content = NULL){
 	}
 	if(isset($_POST['verrodadas'])){
 		$id_grupo=$_POST['grupo'];
-		if( !loteca_admin_grupo($id_grupo) ){
+		if( (!loteca_admin_grupo($id_grupo)) && (!loteca_acessa_grupo($id_grupo)) ){
 			$result.="OCORREU UM ERRO. TENTE NOVAMENTE EM ALGUNS INSTANTES.";
 			return $result;
 		}
