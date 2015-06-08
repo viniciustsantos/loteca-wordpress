@@ -184,17 +184,18 @@ function captura_rodadas($limit,$inicio,$id_grupo=0,$usuario=0){
 	global $wpdb;
 		
 	if($id_grupo == 0){
-	$rodadas=$wpdb->get_results("SELECT A.rodada, A.dt_inicio_palpite, A.dt_fim_palpite, A.dt_sorteio FROM " .
-      	$wpdb->prefix . "loteca_rodada A " .
-		" ORDER BY A.dt_sorteio DESC LIMIT " . $inicio . " , " . $limit ." ;" , OBJECT, 0);
+	$rodadas=$wpdb->get_results("SELECT B.rodada, A.dt_inicio_palpite, A.dt_fim_palpite, A.dt_sorteio FROM " .
+      	 $wpdb->prefix . "loteca_rodada A " .
+		" ORDER BY A.rodada DESC, A.dt_sorteio DESC LIMIT " . $inicio . " , " . $limit ." ;" , OBJECT, 0);
 	}
 		
 	if($id_grupo <> 0){
 	$rodadas=$wpdb->get_results("SELECT A.rodada, A.dt_inicio_palpite, A.dt_fim_palpite, A.dt_sorteio, COALESCE( COUNT(B.rodada) , 0 ) qt_palpites FROM " .
-      	$wpdb->prefix . "loteca_rodada A LEFT JOIN " . $wpdb->prefix . "loteca_palpite B" .
+      	$wpdb->prefix . "loteca_rodada A " . 
+		" LEFT JOIN " . $wpdb->prefix . "loteca_palpite B " .
 		" ON A.rodada = B.rodada AND B.id_grupo = " . $id_grupo . 
 		" GROUP BY A.rodada, A.dt_inicio_palpite, A.dt_fim_palpite, A.dt_sorteio " .
-		" ORDER BY A.dt_sorteio DESC LIMIT " . $inicio . " , " . $limit ." ;" , OBJECT, 0);
+		" ORDER BY A.rodada DESC, A.dt_sorteio DESC LIMIT " . $inicio . " , " . $limit ." ;" , OBJECT, 0);
 	}
 		
 	if(($usuario <> 0)&&($id_grupo <> 0)){
@@ -202,7 +203,7 @@ function captura_rodadas($limit,$inicio,$id_grupo=0,$usuario=0){
       	$wpdb->prefix . "loteca_rodada A LEFT JOIN " . $wpdb->prefix . "loteca_palpite B" .
 		" ON A.rodada = B.rodada AND B.id_grupo = " . $id_grupo . " AND B.id_user = " . $usuario . 
 		" GROUP BY A.rodada, A.dt_inicio_palpite, A.dt_fim_palpite, A.dt_sorteio " .
-		" ORDER BY A.dt_sorteio DESC LIMIT " . $inicio . " , " . $limit ." ;" , OBJECT, 0);
+		" ORDER BY A.rodada DESC, A.dt_sorteio DESC LIMIT " . $inicio . " , " . $limit ." ;" , OBJECT, 0);
 	}
 	return $rodadas;
 }
@@ -1484,13 +1485,13 @@ function tab_admin_resultado($id_grupo,$rodada){
 
 function captura_resultado($rodada){
 	global $wpdb;
-	$palpite=$wpdb->get_results("SELECT C.seq, C.time1, C.time2, C.data, B.time1 vtime1, B.empate, B.time2 vtime2 " .
+	$palpite=$wpdb->get_results("SELECT B.seq, C.time1, C.time2, C.data, B.time1 vtime1, B.empate, B.time2 vtime2 " .
 	    "FROM " .
-		$wpdb->prefix . "loteca_resultado B, " . $wpdb->prefix . "loteca_jogos C " .
-		" WHERE B.rodada = " . $rodada . 
-		" AND B.rodada = C.rodada " . 
+		$wpdb->prefix . "loteca_resultado B LEFT JOIN " . $wpdb->prefix . "loteca_jogos C " .
+		" ON B.rodada = C.rodada " . 
 		" AND B.seq = C.seq " . 
-		" ORDER BY C.seq ASC;" , OBJECT, 0);
+		" WHERE B.rodada = " . $rodada . 
+		" ORDER BY B.seq ASC;" , OBJECT, 0);
 	if($wpdb->last_error!=''){
 		return FALSE;
 	}else{
