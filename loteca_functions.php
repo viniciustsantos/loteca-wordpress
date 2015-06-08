@@ -522,6 +522,14 @@ function shortcode_loteca($atts, $content = NULL){
 		}
 		return acessagrupo($id_grupo) . registrarpalpite($id_grupo) . msg_rodape();
 	}
+	if(isset($_POST['extrato'])){
+		$id_grupo=$_POST['grupo'];
+		if( !loteca_acessa_grupo($id_grupo) ){
+			$result.="OCORREU UM ERRO. TENTE NOVAMENTE EM ALGUNS INSTANTES.";
+			return $result;
+		}
+		return acessagrupo($id_grupo) . extrato($id_grupo) . msg_rodape();
+	}
 	if(isset($_POST['palpitar'])){
 		$id_grupo=$_POST['grupo'];
 		if( !loteca_acessa_grupo($id_grupo) ){
@@ -1881,6 +1889,108 @@ function acessagrupo($id_grupo){
 	return $result;
 }
 
+function extrato($id_grupo){
+ $result='';
+ $extrato=carrega_extrato($id_grupo);
+ if($extrato){
+	$situacao=99;
+	$result.="<TABLE>";
+	$result.="<TR>";
+	$result.="<TH>";
+	$result.="RODADA";
+	$result.="</TH>";
+	$result.="<TH>";
+	$result.="SALDO ANT";
+	$result.="</TH>";
+	$result.="<TH>";
+	$result.="GASTO";
+	$result.="</TH>";
+	$result.="<TH>";
+	$result.="CRÉDITO";
+	$result.="</TH>";
+	$result.="<TH>";
+	$result.="PRÊMIO";
+	$result.="</TH>";
+	$result.="<TH>";
+	$result.="RESGATE";
+	$result.="</TH>";
+	$result.="<TH>";
+	$result.="SALDO ***";
+	$result.="</TH>";
+	$result.="</TR>";
+	foreach($extrato as $linha){
+		$result.="<TR>";
+		$result.="<TD>";
+		$result.=$linha->rodada;
+		$result.="</TD>";
+		$result.="<TD";
+		if($linha->vl_saldo_ant<0){
+			$result.=" class='vermelho'";
+		}
+		$result.=">";
+		$result.=$linha->vl_saldo_ant;
+		$result.="</TD>";
+		$result.="<TD>";
+		$result.=$linha->vl_gasto;
+		$result.="</TD>";
+		$result.="<TD";
+		if($linha->vl_credito>0){
+			$result.=" class='verde'";
+		}
+		$result.=">";
+		$result.=$linha->vl_credito;
+		$result.="</TD>";
+		$result.="<TD";
+		if($linha->vl_premio>0){
+			$result.=" class='verde'";
+		}
+		$result.=">";
+		$result.=$linha->vl_premio;
+		$result.="</TD>";
+		$result.="<TD";
+		if($linha->vl_resgate>0){
+			$result.=" class='vermelho'";
+		}
+		$result.=">";
+		$result.=$linha->vl_resgate;
+		$result.="</TD>";
+		$result.="<TD";
+		if($linha->vl_saldo<0){
+			$result.=" class='vermelho'";
+		}
+		$result.=">";
+		$result.=$linha->vl_saldo . "/" . $linha->saldo;
+		$result.="</TD>";
+		$result.="</TR>";
+	}
+	$result.="<TR>";
+	$result.="<TD COLSPAN=11>";
+	$result.="SALDO ***: CALCULO CONSIDERANDO A MOVIMENTAÇÃO DE VALORES DA ÚLTIMA RODADA/SALDO PARA CONCILIAÇÃO<BR>";
+	$result.="</TD>";
+	$result.="</TR>";
+	$result.="</TABLE>";
+ }else{
+	$result.="<H3>PROBLEMAS NA CAPTURA DAS INFORMAÇÕES DO EXTRATO! TENTE NOVAMENTE MAIS TARDE!</H3>";
+ }
+ 
+ return $result;
+
+}
+
+function carrega_extrato($id_grupo){
+	global $wpdb;
+	$extrato=$wpdb->get_results("SELECT A.id_grupo, A.id_user, A.saldo, A.apelido, A.id_ativo " .
+		", B.rodada, B.participa, B.vl_saldo_ant, B.vl_gasto, B.vl_credito, B.vl_premio, B.vl_resgate, B.vl_saldo, B.ind_credito_processado " . 
+	    "FROM " .
+		$wpdb->prefix . "loteca_participante A LEFT JOIN " . $wpdb->prefix . "loteca_participante_rodada B " . 
+		" ON A.id_grupo = B.id_grupo " .
+		" AND A.id_user = B.id_user " . 
+		" WHERE A.id_grupo = " . $id_grupo . 
+		" AND B.id_user = " . get_current_user_id() . 
+		" ORDER BY B.rodada DESC;" , OBJECT, 0);
+		return $extrato;
+}
+
 function palpitar($id_grupo){
  $result='';
  $jogos=carrega_jogos_palpitar();
@@ -2209,6 +2319,19 @@ function tab_dadosgrupo($id_grupo,$admin = 0,$table = TRUE){
 	$result.="Saldo do grupo: " . $dadosgrupo->saldo_grupo;
 	$result.="</TD>";
 	$result.="</TR>";
+	if($admin==0){
+		$result.="<TR>";
+		$result.="<TD>";
+		$result.="Seu saldo: " . $dadosgrupo->saldo_participante;
+		$result.="</TD>";
+		$result.="<TD>";
+		$result.="...";
+		$result.="</TD>";
+		$result.="<TD>";
+		$result.="...";
+		$result.="</TD>";
+		$result.="</TR>";
+	}
 	if($table){
 		$result.="</TABLE>";
 	}		
@@ -2218,7 +2341,7 @@ function tab_dadosgrupo($id_grupo,$admin = 0,$table = TRUE){
 function dadosgrupo($id_grupo,$admin = 0){
 	global $wpdb;
 	if ($admin==0) {
-		$grupo=$wpdb->get_row("SELECT A.id_grupo, A.id_user, A.nm_grupo, A.id_ativo, B.apelido, SUM(C.saldo) saldo_grupo FROM " .
+		$grupo=$wpdb->get_row("SELECT A.id_grupo, A.id_user, A.nm_grupo, A.id_ativo, B.apelido, SUM(C.saldo) saldo_grupo , B.saldo saldo_participante FROM " .
 			$wpdb->prefix . "loteca_grupo A, " . $wpdb->prefix . "loteca_participante B, " . $wpdb->prefix . "loteca_participante C " . 
 			" WHERE A.id_grupo = B.id_grupo " .
 			" AND A.id_grupo = C.id_grupo " .
