@@ -1960,15 +1960,10 @@ function extrato($id_grupo){
 			$result.=" class='vermelho'";
 		}
 		$result.=">";
-		$result.=$linha->vl_saldo . "/" . $linha->saldo;
+		$result.=$linha->vl_saldo;
 		$result.="</TD>";
 		$result.="</TR>";
 	}
-	$result.="<TR>";
-	$result.="<TD COLSPAN=11>";
-	$result.="SALDO ***: CALCULO CONSIDERANDO A MOVIMENTAÇÃO DE VALORES DA ÚLTIMA RODADA/SALDO PARA CONCILIAÇÃO<BR>";
-	$result.="</TD>";
-	$result.="</TR>";
 	$result.="</TABLE>";
  }else{
 	$result.="<H3>PROBLEMAS NA CAPTURA DAS INFORMAÇÕES DO EXTRATO! TENTE NOVAMENTE MAIS TARDE!</H3>";
@@ -2342,14 +2337,16 @@ function tab_dadosgrupo($id_grupo,$admin = 0,$table = TRUE){
 function dadosgrupo($id_grupo,$admin = 0){
 	global $wpdb;
 	if ($admin==0) {
-		$grupo=$wpdb->get_row("SELECT A.id_grupo, A.id_user, A.nm_grupo, A.id_ativo, B.apelido, SUM(C.saldo) saldo_grupo , B.saldo saldo_participante FROM " .
-			$wpdb->prefix . "loteca_grupo A, " . $wpdb->prefix . "loteca_participante B, " . $wpdb->prefix . "loteca_participante C " . 
+		$grupo=$wpdb->get_row("SELECT A.id_grupo, A.id_user, A.nm_grupo, A.id_ativo, B.apelido, SUM(C.saldo) saldo_grupo , D.saldo saldo_participante FROM " .
+			$wpdb->prefix . "loteca_grupo A, " . $wpdb->prefix . "loteca_participante B, " . $wpdb->prefix . "loteca_participante C, " . $wpdb->prefix . "loteca_participante D " . 
 			" WHERE A.id_grupo = B.id_grupo " .
 			" AND A.id_grupo = C.id_grupo " .
+			" AND A.id_grupo = D.id_grupo " .
 			" AND A.id_grupo = " . $id_grupo . 
 			" AND A.id_user = B.id_user " . 
 			" AND A.id_ativo = 1 " . 
-			" GROUP BY A.id_grupo, A.id_user, A.nm_grupo, A.id_ativo, B.apelido, B.saldo" . 
+			" AND D.id_user = " . get_current_user_id() . " " .
+			" GROUP BY A.id_grupo, A.id_user, A.nm_grupo, A.id_ativo, B.apelido, D.saldo" . 
 			" ORDER BY B.id_grupo ASC;" , OBJECT, 0);
 	}
 	if ($admin==1) {
