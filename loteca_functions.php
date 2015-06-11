@@ -1,5 +1,5 @@
 <?php
-// TESTE de versionamento no github
+
 function loteca_ativar_hook() {
   // Vamos criar um opção para ser guardada na base-de-dados
   // e incluir um valor por defeito.
@@ -514,6 +514,14 @@ function shortcode_loteca($atts, $content = NULL){
 		$result.="<P>FAÇA SEU <a href='".wp_login_url()."'>LOGIN</a> E ACESSE OS BOLÕES QUE VOCÊ ESTÁ PARTICIPANDO OU ADMINISTRA.</P>";
 		$result.=msg_rodape();
 		return $result;
+	}
+	if(isset($_POST['listarparticipantes'])){
+		$id_grupo=$_POST['grupo'];
+		if( !loteca_acessa_grupo($id_grupo) ){
+			$result.="OCORREU UM ERRO. TENTE NOVAMENTE EM ALGUNS INSTANTES.";
+			return $result;
+		}
+		return acessagrupo($id_grupo) . listarparticipantes($id_grupo) . msg_rodape();
 	}
 	if(isset($_POST['registrarpalpite'])){
 		$id_grupo=$_POST['grupo'];
@@ -1856,6 +1864,12 @@ function acessagrupo($id_grupo){
 	$result.="<TD>";
 	$result.="<form method='POST'>";
 	$result.="<input name=grupo type=hidden value=" . $id_grupo .">";
+	$result.="&nbsp;<input name='listarparticipantes' class='loteca button-primary' type='submit' " . SUBMITDISABLED . " value='PARTICIPANTES' />";
+	$result.="</form>";
+	$result.="</TD>";
+	$result.="<TD>";
+	$result.="<form method='POST'>";
+	$result.="<input name=grupo type=hidden value=" . $id_grupo .">";
 	$result.="&nbsp;<input name='palpitar' class='loteca button-primary' type='submit' " . SUBMITDISABLED . " value='PALPITAR' />";
 	$result.="</form>";
 	$result.="</TD>";
@@ -1986,6 +2000,62 @@ function carrega_extrato($id_grupo){
 		" ORDER BY B.rodada DESC;" , OBJECT, 0);
 		return $extrato;
 }
+
+function carrega_participantes($id_grupo){
+	global $wpdb;
+	$participantes=$wpdb->get_results("SELECT A.id_user, A.apelido, B.user_email email, A.id_ativo " .
+	    "FROM " .
+		$wpdb->prefix . "loteca_participante A LEFT JOIN " . $wpdb->prefix . "users B " . 
+		" ON A.id_user = B.ID " . 
+		" WHERE A.id_grupo = " . $id_grupo . 
+		" ORDER BY A.id_ativo DESC, A.apelido ASC;" , OBJECT, 0);
+		return $participantes;
+}
+
+function listarparticipantes($id_grupo){
+ $result='';
+ $participantes=carrega_participantes($id_grupo);
+ if($participantes){
+	$result.="<TABLE>";
+	$result.="<TR>";
+	$result.="<TH>";
+	$result.="ID";
+	$result.="</TH>";
+	$result.="<TH>";
+	$result.="APELIDO";
+	$result.="</TH>";
+	$result.="<TH>";
+	$result.="EMAIL";
+	$result.="</TH>";
+	$result.="<TH>";
+	$result.="SITUAÇÃO";
+	$result.="</TH>";
+	$result.="</TR>";
+	foreach($participantes as $linha){
+		$result.="<TR>";
+		$result.="<TD>";
+		$result.=$linha->id_user;
+		$result.="</TD>";
+		$result.="<TD>";
+		$result.=$linha->apelido;
+		$result.="</TD>";
+		$result.="<TD>";
+		$result.=$linha->email;
+		$result.="</TD>";
+		$result.="<TD>";
+		$result.=$linha->id_ativo==1?'OK':'INATIVO';
+		$result.="</TD>";
+		$result.="</TR>";
+	}
+	$result.="</TABLE>";
+ }else{
+	$result.="<H3>PROBLEMAS NA CAPTURA DAS INFORMAÇÕES DOS PARTICIPANTES! TENTE NOVAMENTE MAIS TARDE!</H3>";
+ }
+ 
+ return $result;
+
+}
+
 
 function palpitar($id_grupo){
  $result='';
