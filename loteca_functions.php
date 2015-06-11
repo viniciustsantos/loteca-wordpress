@@ -506,6 +506,7 @@ function captura_boloes($admin){
 	return $grupos;
 }
 
+
 function shortcode_loteca($atts, $content = NULL){
 	carrega_css();
 	$result="";
@@ -715,6 +716,15 @@ function shortcode_loteca($atts, $content = NULL){
 		$result.="<P>VOCÊ AINDA NÃO PARTICIPA DE NENHUM BOLÃO!</P>";
 		$result.="<P>SOLICITE UM CONVITE DE UM DOS ADMNISTRADORES DOS BOLÕES OU CRIE O SEU PRÓPRIO BOLÃO</P>";
 	}
+	$result.=msg_rodape();
+	return $result;
+}
+
+function shortcode_loteca_estatisticas($atts, $content = NULL){
+	carrega_css();
+	$result="";
+	$result.="TIME 1: " . $_REQUEST['time1'];
+	$result.=" / TIME 2: " . $_REQUEST['time2'];
 	$result.=msg_rodape();
 	return $result;
 }
@@ -2022,6 +2032,9 @@ function listarparticipantes($id_grupo){
 	$result.="ID";
 	$result.="</TH>";
 	$result.="<TH>";
+	$result.="";
+	$result.="</TH>";
+	$result.="<TH>";
 	$result.="APELIDO";
 	$result.="</TH>";
 	$result.="<TH>";
@@ -2035,6 +2048,9 @@ function listarparticipantes($id_grupo){
 		$result.="<TR>";
 		$result.="<TD>";
 		$result.=$linha->id_user;
+		$result.="</TD>";
+		$result.="<TD>";
+		$result.=get_avatar($linha->id_user, 24);
 		$result.="</TD>";
 		$result.="<TD>";
 		$result.=$linha->apelido;
@@ -2200,6 +2216,9 @@ function palpitar($id_grupo){
 	$result.="<TH>";
 	$result.="DIA";
 	$result.="</TH>";
+	$result.="<TH>";
+	$result.="#";
+	$result.="</TH>";
 	$result.="</TR>";
 	foreach($palpites_temp as $palpite){
 		$palpites[$palpite['seq']]['1']=$palpite['time1'];
@@ -2240,15 +2259,25 @@ function palpitar($id_grupo){
 		$result.="<TD>";
 		$result.=$jogo->dia;
 		$result.="</TD>";
+		$result.="<TD>";
+		$result.="<INPUT TYPE=BUTTON VALUE='#' class='loteca button-primary' onclick=";
+		$result.='"window.open(';
+		$result.="'estatisticas?time1=";
+		$result.=$jogo->time1;
+		$result.="&time2=";
+		$result.=$jogo->time2;
+		$result.="'";
+		$result.=')">';
+		$result.="</TD>";
 		$result.="</TR>";
 	}
 	$result.="<TR>";
-	$result.="<TD id='combinacao' COLSPAN=7 class='centralizado'>";
+	$result.="<TD id='combinacao' COLSPAN=8 class='centralizado'>";
 	$result.="S:0 D:0 T:0 J:0 INVÁLIDO";
 	$result.="</TD>";
 	$result.="</TR>";
 	$result.="<TR>";
-	$result.="<TD COLSPAN=7 class='centralizado'>";
+	$result.="<TD COLSPAN=8 class='centralizado'>";
 	$result.="&nbsp;<input id='registrarpalpite' name='registrarpalpite' class='loteca button-primary' type='submit' " . SUBMITDISABLED . " value='REGISTRAR PALPITE' DISABLED/>";
 	$result.="</TD>";
 	$result.="</TR>";

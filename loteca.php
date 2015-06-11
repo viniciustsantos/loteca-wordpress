@@ -55,6 +55,8 @@ add_action( 'plugins_loaded', 'loteca_update_db_check' );
 
 add_shortcode( 'loteca', 'shortcode_loteca' );
 
+add_shortcode( 'loteca-estatisticas', 'shortcode_loteca_estatisticas' );
+
 function loteca_menu() {
 	add_options_page( 'Opções Gerais da Loteca', 'Loteca', 'manage_options', 'loteca-menu', 'loteca_configuration' );
 }
