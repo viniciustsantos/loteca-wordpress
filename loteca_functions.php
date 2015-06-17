@@ -15,6 +15,7 @@ function loteca_desativar_hook() {
 }
 
 function loteca_options() {
+	carrega_js();
 	datetimepicker();
 	if ( !current_user_can( 'manage_options' ) )  {
 		wp_die( __( 'You do not have sufficient permissions to access this page.' ) );
@@ -509,6 +510,7 @@ function captura_boloes($admin){
 
 function shortcode_loteca($atts, $content = NULL){
 	carrega_css();
+	carrega_js();
 	$result="";
 	if ( !is_user_logged_in() ) {
 		$result.="<P>OLÁ, BEM VINDO AO BOLÃO DA LOTECA!</P>";
@@ -691,6 +693,25 @@ function shortcode_loteca($atts, $content = NULL){
 		}
 		return admingrupo($id_grupo) . habilitarrodada($id_grupo) . msg_rodape();
 	}
+	$pendente=resultado_pendente();
+	if($pendente){
+		$result.='
+<script type="text/javascript">
+(function($){ jQuery(document).ready(function($){ 
+$("#loteca-msg").load(function(event) {
+	var acao = $(this).attr("value");
+	$("#loteca-msg").load("' . plugin_dir_url( __FILE__ ).  'loteca_processa_captura.php",{acc:acao},ready());
+});
+ }); })(jQuery);
+function ready(){
+//	alert("Ajax terminou com sucesso.");
+}
+</script>
+	';
+	$result.="<DIV id='loteca-msg'>";
+	$result.="RESULTADO PENDENTE: " . $pendente;
+	$result.="</DIV>";
+	}
 	$boloes_admin=captura_boloes(1);
 	$boloes_usu=captura_boloes(0);
 	if(count($boloes_admin)||count($boloes_usu)){
@@ -722,6 +743,7 @@ function shortcode_loteca($atts, $content = NULL){
 
 function shortcode_loteca_estatisticas($atts, $content = NULL){
 	carrega_css();
+	carrega_js();
 	$result="";
 	$result.="TIME 1: " . $_REQUEST['time1'];
 	$result.=" / TIME 2: " . $_REQUEST['time2'];
@@ -1867,6 +1889,7 @@ function captura_participantes($id_grupo){
 }
 
 function acessagrupo($id_grupo){
+//	carrega_js();
 	$result="";
 	$result.=tab_dadosgrupo($id_grupo,0,TRUE);
 	$result.="<TABLE>";
@@ -2686,6 +2709,13 @@ function carrega_css(){
 	wp_enqueue_style('loteca-style', plugin_dir_url(__FILE__)  . 'css/loteca-style.css', array());
 }
 
+function carrega_js(){
+	wp_enqueue_style('loteca-jquery-ui-css', '//ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/themes/smoothness/jquery-ui.min.css', array());
+	wp_enqueue_style('loteca-admin-styles', plugin_dir_url(__FILE__)  . 'css/style-admin.css', array('wp-color-picker'));
+	wp_enqueue_script('loteca-admin-timepicker-addon-script', plugin_dir_url(__FILE__)  . 'js/jquery-ui-timepicker-addon.js', array('jquery', 'jquery-ui-datepicker'));
+	wp_enqueue_script('loteca-js', plugin_dir_url(__FILE__)  . 'js/loteca_javascript.js', array('jquery', 'jquery-min', 'jquery-ui', 'wp-color-picker'));
+}
+
 function loteca_acessa_grupo($id_grupo){
 	if ( !is_user_logged_in() ) {
 		return FALSE;
@@ -2700,6 +2730,15 @@ function loteca_acessa_grupo($id_grupo){
 		"   AND id_ativo = TRUE " . 
 		";");
 	return $ok;
+}
+
+function resultado_pendente(){
+	if ( !is_user_logged_in() ) {
+		return FALSE;
+	}
+	global $wpdb;
+	$pendente=$wpdb->get_var("SELECT rodada FROM " . $wpdb->prefix . "loteca_rodada WHERE rodada not in (SELECT rodada from " . $wpdb->prefix . "loteca_resultado`) and dt_sorteio <= CURRENT_DATE();");
+	return $pendente;
 }
 
 function loteca_admin_grupo($id_grupo){
@@ -2731,11 +2770,7 @@ function loteca_admin_grupo($id_grupo){
 }
 
 function datetimepicker(){
-	wp_enqueue_style('loteca-jquery-ui-css', '//ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/themes/smoothness/jquery-ui.min.css', array());
-	wp_enqueue_style('loteca-admin-styles', plugin_dir_url(__FILE__)  . 'css/style-admin.css', array('wp-color-picker'));
-
-	wp_enqueue_script('loteca-admin-timepicker-addon-script', plugin_dir_url(__FILE__)  . 'js/jquery-ui-timepicker-addon.js', array('jquery', 'jquery-ui-datepicker'));
-	wp_enqueue_script('loteca-admin-script', plugin_dir_url(__FILE__)  . 'js/scripts-admin.js', array('jquery', 'wp-color-picker'));
+	wp_enqueue_script('loteca-admin-script', plugin_dir_url(__FILE__)  . 'js/scripts-admin.js', array('jquery', 'wp-color-picker', 'loteca-js'));
 }
 
 ?>

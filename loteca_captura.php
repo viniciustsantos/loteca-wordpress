@@ -332,21 +332,21 @@ function captura_cef(){
 		if(!captura_programacao($rodada)){
 			echo '<BR>Erro em captura_programacao<BR>';
 			return FALSE;
+		}else{
+			return TRUE;
 		}
-	}else{
+	} /* else{
 		echo 'Erro em $dia<=$hoje';
 		return FALSE;
 //		echo "# Aguardando prazo para captura da programação " . $rodada . ". (" . date("Y-m-d H:i:s",$dia) . ">" . date("Y-m-d H:i:s",$hoje) . ") #\n";
-	}
-	return TRUE;
+	} */
+	return FALSE;
 }
 
 function loteca_captura(){
 prepara_ambiente();
 config_conexao_mysql();
-if(!captura_cef()){
-	return "NÃO FOI POSSÍVEL VERIFICAR/CAPTURAR RESULTADO E PROGRAMAÇÃO DO SITE DA CEF";
-}else{
+if(captura_cef()){
 	return "JOGOS CAPTURADOS";
 }
 ;
