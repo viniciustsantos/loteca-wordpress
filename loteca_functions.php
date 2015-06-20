@@ -675,7 +675,7 @@ function shortcode_loteca($atts, $content = NULL){
 	}
 	if(isset($_POST['verresultado'])){
 		$id_grupo=$_POST['grupo'];
-		if( !loteca_admin_grupo($id_grupo) ){
+		if(  (!loteca_admin_grupo($id_grupo)) && (!loteca_acessa_grupo($id_grupo))  ){
 			$result.="OCORREU UM ERRO. TENTE NOVAMENTE EM ALGUNS INSTANTES.";
 			return $result;
 		}
@@ -1464,7 +1464,7 @@ function verresultado($id_grupo,$rodada = 0){
 
 function tab_admin_resultado($id_grupo,$rodada){
 	$result.="<TABLE>";
-	$palpite=captura_resultado($rodada);
+	$palpite=captura_resultado($rodada,$id_grupo);
 	$result.="<TR>";
 	$result.="<TH class='direita'>";
 	$result.="TIME DA CASA";
@@ -1484,34 +1484,36 @@ function tab_admin_resultado($id_grupo,$rodada){
 	$result.="</TR>";
 	foreach($palpite as $jogada){
 		$result.="<TR>";
+		
 		$result.="<TD class='direita'>";
 		$result.=$jogada->time1;
 		$result.="</TD>";
-		$result.="<TD class='centralizado'";
+		$result.="<TD class='centralizado";
 		if($jogada->vtime1){
-			$result.=" class='fundovermelho'";
+			$result.=" fundovermelho";
 		}
 		$result.="'>";
-		if($jogada->vtime1){
-			$result.="1";
+		if($jogada->qttime1){
+			$result.=$jogada->qttime1;
 		}
 		$result.="</TD>";
-		$result.="<TD class='centralizado'";
+
+		$result.="<TD class='centralizado";
 		if($jogada->empate){
-			$result.=" class='fundovermelho'";
+			$result.=" fundovermelho";
 		}
 		$result.="'>";
-		if($jogada->empate){
-			$result.="X";
+		if($jogada->qtempate){
+			$result.=$jogada->qtempate;
 		}
 		$result.="</TD>";
-		$result.="<TD class='centralizado'";
+		$result.="<TD class='centralizado";
 		if($jogada->vtime2){
-			$result.=" class='fundovermelho'";
+			$result.=" fundovermelho";
 		}
 		$result.="'>";
-		if($jogada->vtime2){
-			$result.="2";
+		if($jogada->qttime2){
+			$result.=$jogada->qttime2;
 		}
 		$result.="</TD>";
 		$result.="<TD class='esquerda'>";
@@ -1523,22 +1525,28 @@ function tab_admin_resultado($id_grupo,$rodada){
 	return $result;
 }
 
-function captura_resultado($rodada){
+function captura_resultado($rodada,$id_grupo){
 	global $wpdb;
-	$palpite=$wpdb->get_results("SELECT B.seq, C.time1, C.time2, C.data, B.time1 vtime1, B.empate, B.time2 vtime2 " .
+	$palpite=$wpdb->get_results("SELECT C.seq, C.time1, C.time2, C.data, " . 
+		" COALESCE(B.time1,0) vtime1, COALESCE(B.empate,0), COALESCE(B.time2,0) vtime2, " .
+	    "SUM(A.time1) qttime1, SUM(A.empate) qtempate, SUM(A.time2) qttime2 " .
 	    "FROM " .
-		$wpdb->prefix . "loteca_resultado B LEFT JOIN " . $wpdb->prefix . "loteca_jogos C " .
+		$wpdb->prefix . "loteca_jogos C LEFT JOIN " . $wpdb->prefix . "loteca_resultado B " .
 		" ON B.rodada = C.rodada " . 
 		" AND B.seq = C.seq " . 
-		" WHERE B.rodada = " . $rodada . 
-		" ORDER BY B.seq ASC;" , OBJECT, 0);
+		"LEFT JOIN " . $wpdb->prefix . "loteca_palpite A " .
+		" ON C.rodada = A.rodada " . 
+		" AND C.seq = A.seq " . 
+		" AND A.id_grupo = " . $id_grupo .
+		" WHERE C.rodada = " . $rodada . 
+		" GROUP BY C.seq, C.time1, C.time2, C.data, B.time1, B.empate, B.time2 " .
+		" ORDER BY C.seq ASC;" , OBJECT, 0);
 	if($wpdb->last_error!=''){
 		return FALSE;
 	}else{
 		return $palpite;
 	}
 }
-
 
 function verpalpites($id_grupo,$rodada = 0){
 	$result="";
