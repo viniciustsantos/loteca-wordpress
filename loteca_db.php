@@ -2,7 +2,16 @@
 // Verifica banco de dados e cria ou atualiza se necessário
 global $loteca_db_version;
 
-$loteca_db_version = '1.0';
+// ============================================================================
+// Version 1.1 
+// - Inclui parametro do grupo para ser visível para novos usuários
+// - Inclui parametro de custo por usuário por rodada (Comissao)
+// - Inclui gasto fixo por rodada a ser rateado por cada usuário (Custo)
+// ============================================================================
+// Version 1.2
+// - Inclui subadministrador
+
+$loteca_db_version = '1.2';
 
 function loteca_db_install(){
 	global $wpdb;
@@ -47,7 +56,11 @@ function loteca_db_install(){
 		id_grupo int(11) NOT NULL COMMENT 'Número identificador do grupo',
 		id_user int(11) NOT NULL COMMENT 'Número identificador do usuário que administra o grupo',
 		nm_grupo varchar(128) NOT NULL COMMENT 'Nome do grupo',
+		id_user_subadmin int(11) NOT NULL COMMENT 'Número identificador do usuário autorizado pelo administrador com funções administrativas',
 		id_ativo tinyint(1) NOT NULL COMMENT 'Indicador de grupo ativo',
+		id_publico tinyint(1) NOT NULL COMMENT 'Se o grupo for publico ele passa a aceitar inscrições de outros usuários cadastrados no site',
+		vl_comissao decimal(10,2) NOT NULL COMMENT 'Valor da comissão cobrada pelo administrador de cada participante',
+		vl_custo decimal(10,2) NOT NULL COMMENT 'Valor do custo do administrador a ser rateado por igual entre os participantes',
 		id_tipo tinyint(1) NOT NULL COMMENT 'Indicador de tipo de grupo 1 - Normal, 2 - Especial, 3 - Premium',
 		PRIMARY KEY (id_grupo)
 	) $charset_collate ENGINE = INNODB COMMENT = 'Detalhes do grupo do bolão';";
@@ -80,6 +93,8 @@ function loteca_db_install(){
 		vl_credito decimal (10,2) NOT NULL COMMENT 'Valor dos depósitos do participante no periodo',
 		vl_premio decimal (10,2) NOT NULL COMMENT 'Valor da premiacao utilizada para credito no saldo do participante',
 		vl_resgate decimal (10,2) NOT NULL COMMENT 'Valor de resgate efetuado pelo participante',
+		vl_pago_comissao decimal (10,2) NOT NULL COMMENT 'Valor de comissao pago pelo participante ao administrador',
+		vl_pago_custo decimal (10,2) NOT NULL COMMENT 'Valor do rateio do custo do bolão',
 		vl_saldo decimal (10,2) NOT NULL COMMENT 'Valor do saldo resultante',
 		ind_credito_processado tinyint(1) NOT NULL COMMENT 'Indica que o valor do credito já foi verificado e processado',
 		PRIMARY KEY (rodada,id_grupo,id_user)

@@ -226,9 +226,9 @@ function le_pagina_resultados(){
 				$retirar=array("R$ ", "Concurso ","(",")",",");
 				$array=explode(" ", str_replace($retirar, "", $texto));
 				if(count($array)==2){
-					echo "<BR>ARRAY ENCONTRADO:<BR>";
-					var_dump($array);
-					echo "<BR>";
+//					echo "<BR>ARRAY ENCONTRADO:<BR>";
+//					var_dump($array);
+//					echo "<BR>";
 					$info_resultados['CONCURSO']=$array[0];
 					break 2;
 				}
@@ -276,7 +276,7 @@ function le_pagina_resultados(){
 		foreach($info_resultados as $valor){
 			if($valor==0){
 				echo "Erro em $valor==0\n";
-				var_dump($info_resultados);
+//				var_dump($info_resultados);
 				$erro=TRUE;
 				break;
 			}

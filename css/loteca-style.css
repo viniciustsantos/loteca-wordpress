@@ -22,6 +22,17 @@ tr {
 	font-size: 11px;
 }
 
+tr.centralizado > td
+{
+	text-align: center;
+}
+
+tr.borda > td
+{
+  border-width: 2px;
+  border-color: transparent;
+}
+
 td {
 /*	border: 1px solid black; */
 	font-size: 11px;
@@ -64,6 +75,29 @@ td.fundovermelho {
 	background-color: red;
 }
 
+div.fundopreto {
+	background-color: black;
+	color: white;
+	text-align: center;
+	padding-left:2px;
+	padding-right:2px;
+}
+
+td.fundoazul {
+	background-color: blue;
+}
+th.b-esq, td.b-esq {
+	border-left-width: 1px;
+	border-collapse: collapse;
+}
+th.b-dir, td.b-dir {
+	border-right-width: 1px;
+	border-collapse: collapse;
+}
+td.borda {
+	border-width: 2px 2px 2px 2px;
+	border-color: transparent;
+}
 form {
  margin-top:0px;
  margin-bottom:0px;

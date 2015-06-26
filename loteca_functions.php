@@ -6,12 +6,80 @@ function loteca_ativar_hook() {
   update_option( 'loteca_ativa' , '1' );
   update_option( 'loteca_limite_desdobramento' , '50000' );
   update_option( 'loteca_limite_participante' , '50' );
+  myplugin_activation_hook();
 }
 
 function loteca_desativar_hook() {
   // Vamos criar um opção para ser guardada na base-de-dados
   // e incluir um valor por defeito.
   update_option( 'loteca_ativa' , '0' );
+  myplugin_deactivation_hook();
+}
+
+
+function myplugin_activation_hook(){
+$estatisticas_id = 'estatisticas-loteca-id';
+$estatisticas_permalink = 'estatisticas-loteca';
+$estatisticas_title = 'Loteca - Estatísticas';
+	
+    // the menu entry...
+    delete_option($estatisticas_title);
+    add_option($estatisticas_title, $estatisticas_title, '', 'yes');
+    // the slug...
+    delete_option($estatisticas_permalink);
+    add_option($estatisticas_permalink, $estatisticas_permalink, '', 'yes');
+    // the id...
+    delete_option($estatisticas_id);
+    add_option($estatisticas_id, '0', '', 'yes');
+	
+	$the_page = get_page_by_title( $estatisticas_title );
+	
+if ( ! $the_page ) {
+
+        // Create post object
+        $_p = array();
+        $_p['post_title'] = $estatisticas_title;
+        $_p['post_name'] = $estatisticas_permalink;
+        $_p['post_content'] = "[loteca-estatisticas]";
+        $_p['post_status'] = 'publish';
+        $_p['post_type'] = 'page';
+        $_p['comment_status'] = 'closed';
+        $_p['ping_status'] = 'closed';
+        $_p['post_category'] = array(1); 
+
+        // Insert the post into the database
+        $the_page_id = wp_insert_post( $_p );
+    }
+    else {
+        // the plugin may have been previously active and the page may just be trashed...
+
+        $the_page_id = $the_page->ID;
+
+        //make sure the page is not trashed...
+        $the_page->post_status = 'publish';
+		$the_page->post_name = $estatisticas_permalink;
+        $the_page_id = wp_update_post( $the_page );
+    }
+	
+    delete_option($estatisticas_id);
+    add_option($estatisticas_id, $the_page_id );
+}
+
+function myplugin_deactivation_hook(){
+$estatisticas_id = 'estatisticas-loteca-id';
+$estatisticas_permalink = 'estatisticas-loteca';
+$estatisticas_title = 'Loteca - Estatísticas';
+
+   $the_page_id = get_option($estatisticas_id);
+    if( $the_page_id ) {
+
+        wp_delete_post( $the_page_id ); // this will trash, not delete
+
+    }
+
+    delete_option($estatisticas_title);
+    delete_option($estatisticas_permalink);
+    delete_option($estatisticas_id);
 }
 
 function loteca_options() {
@@ -507,6 +575,60 @@ function captura_boloes($admin){
 	return $grupos;
 }
 
+function shortcode_loteca_link_cef() {
+	$url='http://loterias.caixa.gov.br/wps/portal/loterias/landing/loteca/';
+	$ch = curl_init();
+	curl_setopt($ch, CURLOPT_URL, $url);
+	curl_setopt($ch, CURLOPT_HEADER, 0);
+	curl_setopt($ch, CURLOPT_NOBODY, 0);
+	curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // Must be set to true so that PHP follows any "Location:" header
+	curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+	curl_setopt($ch, CURLOPT_COOKIEJAR, 'cookies.txt'); 
+	
+	$a = curl_exec($ch); // $a will contain all headers
+	
+	$url = rtrim(curl_getinfo($ch, CURLINFO_EFFECTIVE_URL), '/'); // This is what you need, it will return you the last effective URL
+	
+	// Uncomment to see all headers
+	/*
+	echo "<pre>";
+	print_r($a);echo"<br>";
+	echo "</pre>";
+	*/
+	
+	return $url; // Voila
+}
+
+function get_redirect_url($url){
+    $redirect_url = null; 
+
+    $url_parts = @parse_url($url);
+    if (!$url_parts) return false;
+    if (!isset($url_parts['host'])) return false; //can't process relative URLs
+    if (!isset($url_parts['path'])) $url_parts['path'] = '/';
+
+    $sock = fsockopen($url_parts['host'], (isset($url_parts['port']) ? (int)$url_parts['port'] : 80), $errno, $errstr, 30);
+    if (!$sock) return false;
+
+    $request = "HEAD " . $url_parts['path'] . (isset($url_parts['query']) ? '?'.$url_parts['query'] : '') . " HTTP/1.1\r\n"; 
+    $request .= 'Host: ' . $url_parts['host'] . "\r\n"; 
+    $request .= "Connection: Close\r\n\r\n"; 
+    fwrite($sock, $request);
+    $response = '';
+    while(!feof($sock)) $response .= fread($sock, 8192);
+    fclose($sock);
+
+    if (preg_match('/^Location: (.+?)$/m', $response, $matches)){
+        if ( substr($matches[1], 0, 1) == "/" )
+            return $url_parts['scheme'] . "://" . $url_parts['host'] . trim($matches[1]);
+        else
+            return trim($matches[1]);
+
+    } else {
+        return false;
+    }
+
+}
 
 function shortcode_loteca($atts, $content = NULL){
 	carrega_css();
@@ -514,9 +636,20 @@ function shortcode_loteca($atts, $content = NULL){
 	$result="";
 	if ( !is_user_logged_in() ) {
 		$result.="<P>OLÁ, BEM VINDO AO BOLÃO DA LOTECA!</P>";
-		$result.="<P>FAÇA SEU <a href='".wp_login_url()."'>LOGIN</a> E ACESSE OS BOLÕES QUE VOCÊ ESTÁ PARTICIPANDO OU ADMINISTRA.</P>";
+		$result.="<P>FAÇA SEU <a href='".wp_login_url()."'>LOGIN</a> E ACESSE OS BOLÕES QUE VOCÊ ESTÁ PARTICIPANDO E/OU ADMINISTRA.</P>";
+		$result.="<P>PARA CRIAR UM NOVO BOLÃO TAMBÉM É NECESSÁRIO FAZER O LOGIN ANTES.</P>";
 		$result.=msg_rodape();
 		return $result;
+	}
+	if(isset($_POST['quero_participar'])){
+		$id_grupo=$_POST['grupo'];
+		return quero_participar($id_grupo) . msg_rodape();
+	}
+	if(isset($_POST['SOLICITAR'])){
+		return listargruposabertos() . msg_rodape();
+	}
+	if(isset($_POST['CRIAR'])){
+		$result.='<P>CLICOU EM CRIAR</P>';
 	}
 	if(isset($_POST['listarparticipantes'])){
 		$id_grupo=$_POST['grupo'];
@@ -556,7 +689,7 @@ function shortcode_loteca($atts, $content = NULL){
 			$result.="OCORREU UM ERRO. TENTE NOVAMENTE EM ALGUNS INSTANTES.";
 			return $result;
 		}
-		return acessagrupo($id_grupo) . msg_rodape();
+		return acessagrupo($id_grupo) .  acessagrupo_2($id_grupo) . msg_rodape();
 	}
 
 	if(isset($_POST['admingrupo'])){
@@ -631,6 +764,14 @@ function shortcode_loteca($atts, $content = NULL){
 		}
 		return admingrupo($id_grupo) . ativarparticipante($id_grupo) . msg_rodape();
 	}
+	if(isset($_POST['alterarparametros'])){
+		$id_grupo=$_POST['grupo'];
+		if( !loteca_admin_grupo($id_grupo) ){
+			$result.="OCORREU UM ERRO. TENTE NOVAMENTE EM ALGUNS INSTANTES.";
+			return $result;
+		}
+		return admingrupo($id_grupo) . alterarparametros($id_grupo) . msg_rodape();
+	}
 	if(isset($_POST['verrodadas'])){
 		$id_grupo=$_POST['grupo'];
 		if( (!loteca_admin_grupo($id_grupo)) && (!loteca_acessa_grupo($id_grupo)) ){
@@ -693,25 +834,7 @@ function shortcode_loteca($atts, $content = NULL){
 		}
 		return admingrupo($id_grupo) . habilitarrodada($id_grupo) . msg_rodape();
 	}
-	$pendente=resultado_pendente();
-	if($pendente){
-		$result.='
-<script type="text/javascript">
-(function($){ jQuery(document).ready(function($){ 
-$("#loteca-msg").load(function(event) {
-	var acao = $(this).attr("value");
-	$("#loteca-msg").load("' . plugin_dir_url( __FILE__ ).  'loteca_processa_captura.php",{acc:acao},ready());
-});
- }); })(jQuery);
-function ready(){
-//	alert("Ajax terminou com sucesso.");
-}
-</script>
-	';
-	$result.="<DIV id='loteca-msg'>";
-	$result.="RESULTADO PENDENTE: " . $pendente;
-	$result.="</DIV>";
-	}
+
 	$boloes_admin=captura_boloes(1);
 	$boloes_usu=captura_boloes(0);
 	if(count($boloes_admin)||count($boloes_usu)){
@@ -727,7 +850,7 @@ function ready(){
 		if(count($boloes_usu)){
 			if((count($boloes_admin)==0)&&(count($boloes_usu)==1)){
 				foreach ($boloes_usu as $bolao){
-					$result.=acessagrupo($bolao->id_grupo);
+					$result.=acessagrupo($bolao->id_grupo) . acessagrupo_2($bolao->id_grupo);
 				}
 			}else{
 				$result.=tab_grupos_usu($boloes_usu);
@@ -736,6 +859,8 @@ function ready(){
 	}else{
 		$result.="<P>VOCÊ AINDA NÃO PARTICIPA DE NENHUM BOLÃO!</P>";
 		$result.="<P>SOLICITE UM CONVITE DE UM DOS ADMNISTRADORES DOS BOLÕES OU CRIE O SEU PRÓPRIO BOLÃO</P>";
+		$result.="<form method='post' style='display:inline'><INPUT TYPE=submit NAME='SOLICITAR' VALUE='SOLICITAR' /></form> ";
+		$result.="<form method='post' style='display:inline'><INPUT TYPE=submit NAME='CRIAR' VALUE='CRIAR' /></form>";
 	}
 	$result.=msg_rodape();
 	return $result;
@@ -761,6 +886,27 @@ function verrodadas($id_grupo,$inicio,$usuario){
 
 function admingrupo($id_grupo){
 	$result="";
+	
+	$pendente=resultado_pendente();
+	if( $pendente ){
+		$result.='
+<script type="text/javascript">
+(function($){ jQuery(document).ready(function($){ 
+$("#loteca-msg").click(function(event) {
+	var acao = $(this).attr("value");
+	$("#loteca-msg").load("' . plugin_dir_url( __FILE__ ).  'loteca_processa_captura.php",{acc:acao},ready());
+});
+ }); })(jQuery);
+function ready(){
+//	alert("Ajax terminou com sucesso.");
+}
+</script>
+	';
+	$result.="<DIV id='loteca-msg'>";
+	$result.="RESULTADO PENDENTE: " . $pendente;
+	$result.="</DIV>";
+	}
+	
 	$novarodada=novarodada($id_grupo);
 	$result.="<TABLE>";
 	$result.=tab_dadosgrupo($id_grupo,1,FALSE);
@@ -773,18 +919,53 @@ function admingrupo($id_grupo){
 	$result.="<TABLE>";
 	$result.="<TR>";
 	$result.="<TD>";
+	$result.="GERAL";
+	$result.="</TD>";
+	$result.="<TD>";
 	$result.="<form method='POST'>";
 	$result.="<input name=grupo type=hidden value=" . $id_grupo .">";
 	$result.="&nbsp;<input name='adminparticipantes' class='loteca button-primary' type='submit' " . SUBMITDISABLED . " value='PARTICIPANTES' />";
 	$result.="</form>";
 	$result.="</TD>";
-	
+	$result.="<TD>";
+	$result.="<form method='POST'>";
+	$result.="<input name=grupo type=hidden value=" . $id_grupo .">";
+	$result.="&nbsp;<input name='alterarparametros' class='loteca button-primary' type='submit' " . SUBMITDISABLED . " value='CONFIGURAR' />";
+	$result.="</form>";
+	$result.="</TD>";
+	$result.="<TD>";
+	$result.="<form method='POST'>";
+	$result.="<input name=grupo type=hidden value=" . $id_grupo .">";
+	$result.="&nbsp;<input name='verrodadas' class='loteca button-primary' type='submit' " . SUBMITDISABLED . " value='RODADAS' />";
+	$result.="</form>";
+	$result.="</TD>";
+	$boloes_admin=captura_boloes(1);
+	$boloes_usu=captura_boloes(0);
+
+	if((count($boloes_admin))+(count($boloes_usu))>1){
+		$result.="<TD>";
+		$result.="<form method='POST'>";
+		$result.="<input name=grupo type=hidden value=" . $id_grupo .">";
+		$result.="&nbsp;<input name='VOLTAR' class='loteca button-primary' type='submit' " . SUBMITDISABLED . " value='VOLTAR' />";
+		$result.="</form>";
+		$result.="</TD>";
+	}
+/*
 	$result.="<TD>";
 	$result.="<form method='POST'>";
 	$result.="<input name=grupo type=hidden value=" . $id_grupo .">";
 	$result.="&nbsp;<input name='verdesdobramento' class='loteca button-primary' type='submit' " . SUBMITDISABLED . " value='DESDOBRAMENTO' />";
 	$result.="</form>";
 	$result.="</TD>";
+*/
+	$result.="</TR>";
+	$result.="</TABLE>";
+	$result.="<TABLE>";
+	$result.="<TR>";
+	$result.="<TD>";
+	$result.="RODADA ATUAL";
+	$result.="</TD>";
+	
 	$result.="<TD>";
 	$result.="<form method='POST'>";
 	$result.="<input name=grupo type=hidden value=" . $id_grupo .">";
@@ -810,24 +991,6 @@ function admingrupo($id_grupo){
 	$result.="&nbsp;<input name='incluirpremio' class='loteca button-primary' type='submit' " . SUBMITDISABLED . " value='INCLUIR PRÊMIO' />";
 	$result.="</form>";
 	$result.="</TD>";
-	$result.="<TD>";
-	$result.="<form method='POST'>";
-	$result.="<input name=grupo type=hidden value=" . $id_grupo .">";
-	$result.="&nbsp;<input name='verrodadas' class='loteca button-primary' type='submit' " . SUBMITDISABLED . " value='RODADAS' />";
-	$result.="</form>";
-	$result.="</TD>";
-	$boloes_admin=captura_boloes(1);
-	$boloes_usu=captura_boloes(0);
-
-	if((count($boloes_admin))||(count($boloes_usu))){
-		$result.="<TD>";
-		$result.="<form method='POST'>";
-		$result.="<input name=grupo type=hidden value=" . $id_grupo .">";
-		$result.="&nbsp;<input name='' class='loteca button-primary' type='submit' " . SUBMITDISABLED . " value='VOLTAR' />";
-		$result.="</form>";
-		$result.="</TD>";
-	}
-
 	$result.="</TR>";
 	$result.="</TABLE>";
 	return $result;
@@ -869,7 +1032,7 @@ function db_habilitarrodada($id_grupo,$rodada){
 	"
 		INSERT INTO " . $wpdb->prefix ."loteca_participante_rodada 
 			(rodada, id_grupo, id_user, participa, motivo, vl_saldo_ant, vl_gasto, vl_credito, vl_premio, vl_saldo,
-			 ind_credito_processado, vl_resgate)
+			 ind_credito_processado, vl_resgate, vl_pago_comissao, vl_pago_custo)
 			(SELECT %s as rodada, 
 					%s as id_grupo, 
 					id_user, 
@@ -881,7 +1044,9 @@ function db_habilitarrodada($id_grupo,$rodada){
 					0 as vl_premio,
 					saldo as vl_saldo,
 					0 as ind_credito_processado,
-					0 as vl_resgate
+					0 as vl_resgate,
+					0 as vl_pago_comissao,
+					0 as vl_pago_custo
 			FROM wp_loteca_participante A
 			WHERE id_grupo = %s
 			)
@@ -895,6 +1060,42 @@ function db_habilitarrodada($id_grupo,$rodada){
 		@mysql_query("COMMIT", $wpdb->dbh);
 		return TRUE;
 	}
+}
+
+function alterarparametros($id_grupo){
+	$result="";
+	if(isset($_POST['confirma'])){
+		$result.=confirma_alterarparametros();
+	}else{
+		$result.=recebe_alterarparametos();
+	}
+	return $result;
+}
+
+function confirma_alterarparametros(){
+	$result="";
+	return $result;
+}
+
+function recebe_alterarparametos(){
+	$result="";
+	$result.="VALOR MÁXIMO:";
+	$result.="<BR>";
+	$result.="VALOR MÍNIMO:";
+	$result.="<BR>";
+	$result.="QUANTO GASTAR:";
+	$result.="<BR>";
+	$result.="ZEBRAS POR VOLANTE(MÍN):";
+	$result.="<BR>";
+	$result.="ZEBRAS POR VOLANTE(MÁX):";
+	$result.="<BR>";
+	$result.="AMPLIA ZEBRAS:";
+	$result.="<BR>";
+	$result.="VOLANTE COM COTA:";
+	$result.="<BR>";
+	$result.="VALOR MÍNIMO POR COTA (CAIXA):";
+	$result.="<BR>";
+	return $result;
 }
 
 function incluirpremio($id_grupo){
@@ -934,7 +1135,7 @@ function db_inclui_premio($id_grupo,$rodada,$valor){
 	$wpdb->query( $wpdb->prepare( 
 	"
 		UPDATE " . $wpdb->prefix . "loteca_participante_rodada
-		SET vl_premio = %s , vl_saldo =  vl_saldo_ant + vl_credito + %s - vl_gasto - vl_resgate
+		SET vl_premio = %s , vl_saldo =  vl_saldo_ant + vl_credito + %s - vl_gasto - vl_resgate - vl_pago_comissao - vl_pago_custo
 		WHERE id_grupo = %s
 	      AND rodada = %s
 		  AND participa = 1
@@ -998,7 +1199,7 @@ function db_inclui_gasto($id_grupo,$rodada,$valor){
 	$wpdb->query( $wpdb->prepare( 
 	"
 		UPDATE " . $wpdb->prefix . "loteca_participante_rodada 
-		SET vl_gasto = %s , vl_saldo =  vl_saldo_ant + vl_credito + vl_premio - %s - vl_resgate
+		SET vl_gasto = %s , vl_saldo =  vl_saldo_ant + vl_credito + vl_premio - %s - vl_resgate - vl_pago_comissao - vl_pago_custo
 		WHERE id_grupo = %s
 	      AND rodada = %s
 		  AND participa = 1
@@ -1156,7 +1357,7 @@ function db_inclui_resgate($id_grupo,$id_user,$rodada,$valor){
 	$wpdb->query( $wpdb->prepare( 
 	"
 		UPDATE " . $wpdb->prefix . "loteca_participante_rodada
-		SET vl_resgate = %s , vl_saldo =  vl_saldo_ant + vl_credito + vl_premio - vl_gasto - %s 
+		SET vl_resgate = %s , vl_saldo =  vl_saldo_ant + vl_credito + vl_premio - vl_gasto - %s - vl_pago_comissao - vl_pago_custo
 		WHERE id_grupo = %s
 	      AND rodada = %s
 		  AND id_user = %s
@@ -1436,7 +1637,7 @@ function db_inclui_credito($id_grupo,$id_user,$rodada,$valor){
 	$wpdb->query( $wpdb->prepare( 
 	"
 		UPDATE " . $wpdb->prefix . "loteca_participante_rodada
-		SET vl_credito = %s , vl_saldo =  vl_saldo_ant + %s + vl_premio - vl_gasto - vl_resgate 
+		SET vl_credito = %s , vl_saldo =  vl_saldo_ant + %s + vl_premio - vl_gasto - vl_resgate - vl_pago_comissao - vl_pago_custo
 		WHERE id_grupo = %s
 	      AND rodada = %s
 		  AND id_user = %s
@@ -1463,8 +1664,13 @@ function verresultado($id_grupo,$rodada = 0){
 }
 
 function tab_admin_resultado($id_grupo,$rodada){
-	$result.="<TABLE>";
+	$result.="<TABLE class='minimo'>";
 	$palpite=captura_resultado($rodada,$id_grupo);
+	$result.="<TR>";
+	$result.="<TH class='centralizado' COLSPAN=5>";
+	$result.="RODADA : " . $rodada;
+	$result.="</TH>";
+	$result.="</TR>";
 	$result.="<TR>";
 	$result.="<TH class='direita'>";
 	$result.="TIME DA CASA";
@@ -1484,37 +1690,55 @@ function tab_admin_resultado($id_grupo,$rodada){
 	$result.="</TR>";
 	foreach($palpite as $jogada){
 		$result.="<TR>";
-		
 		$result.="<TD class='direita'>";
 		$result.=$jogada->time1;
 		$result.="</TD>";
 		$result.="<TD class='centralizado";
+		$result.="'><DIV class='";
 		if($jogada->vtime1){
-			$result.=" fundovermelho";
+			$result.=" fundopreto";
 		}
 		$result.="'>";
 		if($jogada->qttime1){
 			$result.=$jogada->qttime1;
+			$result.="&nbsp;/&nbsp;" . $jogada->peso1;
+		}else
+		{
+			$result.="&nbsp;";
 		}
+		$result.="</DIV>";
 		$result.="</TD>";
 
 		$result.="<TD class='centralizado";
+		$result.="'><DIV class='";
 		if($jogada->empate){
-			$result.=" fundovermelho";
+			$result.=" fundopreto";
 		}
 		$result.="'>";
 		if($jogada->qtempate){
 			$result.=$jogada->qtempate;
+			$result.="&nbsp;/&nbsp;";
+			$result.=$jogada->pesoe;
+		}else
+		{
+			$result.="&nbsp;";
 		}
+		$result.="</DIV>";
 		$result.="</TD>";
 		$result.="<TD class='centralizado";
+		$result.="'><DIV class='";
 		if($jogada->vtime2){
-			$result.=" fundovermelho";
+			$result.=" fundopreto";
 		}
 		$result.="'>";
 		if($jogada->qttime2){
 			$result.=$jogada->qttime2;
+			$result.="&nbsp;/&nbsp;" .$jogada->peso2;
+		}else
+		{
+			$result.="&nbsp;";
 		}
+		$result.="</DIV>";
 		$result.="</TD>";
 		$result.="<TD class='esquerda'>";
 		$result.=$jogada->time2;
@@ -1528,8 +1752,11 @@ function tab_admin_resultado($id_grupo,$rodada){
 function captura_resultado($rodada,$id_grupo){
 	global $wpdb;
 	$palpite=$wpdb->get_results("SELECT C.seq, C.time1, C.time2, C.data, " . 
-		" COALESCE(B.time1,0) vtime1, COALESCE(B.empate,0), COALESCE(B.time2,0) vtime2, " .
-	    "SUM(A.time1) qttime1, SUM(A.empate) qtempate, SUM(A.time2) qttime2 " .
+		" COALESCE(B.time1,0) vtime1, COALESCE(B.empate,0) empate, COALESCE(B.time2,0) vtime2, " .
+	    "SUM(A.time1) qttime1, SUM(A.empate) qtempate, SUM(A.time2) qttime2, " .
+		"SUM(IF(A.time1=1,IF(A.empate=1,IF(A.time2=1,2,3),IF(A.time2=1,3,6)),0)) peso1, " .
+		"SUM(IF(A.empate=1,IF(A.time1=1,IF(A.time2=1,2,3),IF(A.time2=1,3,6)),0)) pesoe, " . 
+		"SUM(IF(A.time2=1,IF(A.empate=1,IF(A.time1=1,2,3),IF(A.time1=1,3,6)),0)) peso2 " .
 	    "FROM " .
 		$wpdb->prefix . "loteca_jogos C LEFT JOIN " . $wpdb->prefix . "loteca_resultado B " .
 		" ON B.rodada = C.rodada " . 
@@ -1931,7 +2158,7 @@ function acessagrupo($id_grupo){
 	$boloes_admin=captura_boloes(1);
 	$boloes_usu=captura_boloes(0);
 
-	if((count($boloes_admin))||(count($boloes_usu))){
+	if((count($boloes_admin))+(count($boloes_usu))>1){
 		$result.="<TD>";
 		$result.="<form method='POST'>";
 		$result.="<input name=grupo type=hidden value=" . $id_grupo .">";
@@ -1940,6 +2167,20 @@ function acessagrupo($id_grupo){
 		$result.="</TD>";
 	}
 
+	$result.="</TR>";
+	$result.="</TABLE>";
+	return $result;
+}
+
+function acessagrupo_2($id_grupo){
+	$result="";
+	$result.="<TABLE>";
+	$result.="<TR>";
+	$result.="<TD>";
+	$result.="<form method='POST'>";
+	$result.="<input name='SOLICITAR' class='loteca button-primary' type='submit' " . SUBMITDISABLED . " value='PARTICIPAR DE OUTROS GRUPOS' />";
+	$result.="</form>";
+	$result.="</TD>";
 	$result.="</TR>";
 	$result.="</TABLE>";
 	return $result;
@@ -2293,12 +2534,12 @@ function palpitar($id_grupo){
 		$result.="<TD>";
 		$result.="<INPUT TYPE=BUTTON VALUE='#' class='loteca button-primary' onclick=";
 		$result.='"window.open(';
-		$result.="'estatisticas?time1=";
+		$result.="'estatisticas-loteca?time1=";
 		$result.=$jogo->time1;
 		$result.="&time2=";
 		$result.=$jogo->time2;
 		$result.="'";
-		$result.=')">';
+		$result.=',' . "'loteca-estatisticas'" . ')">';
 		$result.="</TD>";
 		$result.="</TR>";
 	}
@@ -2745,7 +2986,7 @@ function resultado_pendente(){
 		return FALSE;
 	}
 	global $wpdb;
-	$pendente=$wpdb->get_var("SELECT rodada FROM " . $wpdb->prefix . "loteca_rodada WHERE rodada not in (SELECT rodada from " . $wpdb->prefix . "loteca_resultado`) and dt_sorteio <= CURRENT_DATE();");
+	$pendente=$wpdb->get_var("SELECT rodada FROM " . $wpdb->prefix . "loteca_rodada WHERE rodada not in (SELECT rodada from " . $wpdb->prefix . "loteca_resultado) and dt_sorteio <= CURRENT_DATE();");
 	return $pendente;
 }
 
@@ -2775,6 +3016,154 @@ function loteca_admin_grupo($id_grupo){
 		"   AND id_admin = TRUE " . 
 		";");
 	return $ok;
+}
+
+function listargruposabertos(){
+	$gruposabertos=captura_grupos_abertos();
+	$result="";
+	if($gruposabertos){
+		$result.="<table>";
+		$result.="<tr>";
+		$result.="<th>";
+		$result.="ID";
+		$result.="</th>";
+		$result.="<th>";
+		$result.="Grupo";
+		$result.="</th>";
+		$result.="<th>";
+		$result.="Administrador";
+		$result.="</th>";
+		$result.="<th>";
+		$result.="Nome";
+		$result.="</th>";
+		$result.="<th>";
+		$result.="Email";
+		$result.="</th>";
+		$result.="<th>";
+		$result.="Participantes";
+		$result.="</th>";
+		$result.="<th>";
+		$result.="QUERO";
+		$result.="</th>";
+		$result.="</tr>";
+		
+		foreach($gruposabertos as $linha){
+			$result.="<tr class='centralizado'>";
+			$result.="<td>";
+			$result.=$linha->id_grupo ;
+			$result.="</td>";
+			$result.="<td>";
+			$result.=$linha->nm_grupo ;
+			$result.="</td>";
+			$result.="<td>";
+			$result.=$linha->id_user ;
+			$result.=" - ";
+			$result.=$linha->apelido ;
+			$result.="</td>";
+			$result.="<td>";
+			$result.=$linha->nome ;
+			$result.="</td>";
+			$result.="<td>";
+			$result.=$linha->email ;
+			$result.="</td>";
+			$result.="<td>";
+			$result.=$linha->qt_participante ;
+			$result.="</td>";
+			$result.="<td>";
+			$result.="<form method='post' style='display:inline'><input type=submit name='quero_participar' value='SOLICITAR'><input type=hidden name=grupo value='". $linha->id_grupo. "'></form>";
+			$result.="</td>";
+			$result.="</tr>";
+		}
+		$result.="</table>";
+	}else{
+		$result.="NENHUM GRUPO DISPONÍVEL PARA SOLICITAR PARTICIPAÇÃO.";
+		$result.="<form method='post' style='display:inline'><input type=submit name='VOLTAR' value='VOLTAR' /></form>";
+	}
+	return $result;
+}
+
+function captura_grupos_abertos(){
+	global $wpdb;
+	return $wpdb->get_results( 
+	//$wpdb->prepare( 
+	"
+		SELECT  A.id_grupo id_grupo, A.nm_grupo nm_grupo, A.id_user id_user, D.apelido apelido, B.user_email email, B.display_name nome, COUNT(*) qt_participante
+		 FROM " . $wpdb->prefix . "loteca_grupo A
+		  LEFT JOIN " . $wpdb->prefix . "loteca_participante D
+		    ON A.id_user = D.id_user AND A.id_grupo = D.id_grupo
+			, " . $wpdb->prefix . "users B, " . $wpdb->prefix . "loteca_participante C
+		WHERE A.id_publico = 1 AND A.id_ativo = 1
+		  AND A.id_user = B.ID
+		  AND A.id_grupo = C.id_grupo
+		  AND C.id_ativo = 1
+		  AND A.id_grupo NOT IN ( SELECT id_grupo FROM " . $wpdb->prefix . "loteca_participante WHERE id_user = " . get_current_user_id() . ")
+		  GROUP BY A.id_grupo, A.nm_grupo, A.id_user, D.apelido, B.user_email, B.display_name
+		; 
+	"
+//	, $var )
+	 , OBJECT, 0);
+	
+}
+
+function quero_participar ($id_grupo){
+	if(verifica_grupo_aberto($id_grupo)){
+		if(inclui_solicitacao($id_grupo)){
+			return "Solicitação efetuada, o administrador do bolão receberá um email informando.";
+		}else{
+			return "Não foi possível incluir sua solicitação. Entre em contato com o administrador do bolão.";
+		}
+	}else{
+		return "Não foi possível incluir sua solicitação. Entre em contato com o administrador do bolão.";
+	}
+}
+
+function verifica_grupo_aberto($id_grupo){
+	global $wpdb;
+	$count_grupo = $wpdb->get_var( 
+		$wpdb->prepare( 
+	"
+		SELECT   COUNT(*)
+		 FROM " . $wpdb->prefix . "loteca_grupo A
+		WHERE A.id_publico = 1 AND A.id_ativo = 1
+		  AND A.id_grupo = %s
+		; 
+	"
+		, $id_grupo )
+	 );
+	 $count_participante = $wpdb->get_var( 
+		$wpdb->prepare( 
+	"
+		SELECT   COUNT(*)
+		 FROM " . $wpdb->prefix . "loteca_participante A
+		WHERE A.id_grupo = %s
+		  AND A.id_user = %s
+		; 
+	"
+		, $id_grupo , get_current_user_id())
+	 );
+	if(($count_participante==0)&&($count_grupo==1)){
+		return TRUE;
+	}else{
+		return FALSE;
+	}
+}
+
+function inclui_solicitacao($id_grupo){
+	global $wpdb;
+	$query = $wpdb->prepare( 
+	"
+		INSERT INTO " . $wpdb->prefix . "loteca_participante (id_grupo, id_user, saldo, apelido, qt_cotas, id_ativo, id_admin)
+		VALUES ( '%s' , '%s' , 0 , '%s' , 0 , 0 , 0 )
+		;
+	", 
+	$id_grupo, get_current_user_id(), wp_get_current_user()->display_name );
+	$wpdb->query( $query );
+	if($wpdb->last_error==""){
+		return TRUE;
+	}else{
+		return FALSE;
+	}
+
 }
 
 function datetimepicker(){
