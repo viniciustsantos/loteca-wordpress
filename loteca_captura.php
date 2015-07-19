@@ -1,6 +1,7 @@
 <?php
 
 include_once 'loteca_geral.php';
+//include_once 'loteca_db_functions.php';
 
 function busca_info_ult_rodada(){
 	$sql="SELECT rodada, dt_sorteio FROM `wp_loteca_rodada` where rodada = (select max(rodada) from  `wp_loteca_rodada`)";

@@ -2,16 +2,19 @@
 // Verifica banco de dados e cria ou atualiza se necessário
 global $loteca_db_version;
 
+// Version 1.3
+// - Inclui indicador de participante excluído
+// ============================================================================
+// Version 1.2
+// - Inclui subadministrador
 // ============================================================================
 // Version 1.1 
 // - Inclui parametro do grupo para ser visível para novos usuários
 // - Inclui parametro de custo por usuário por rodada (Comissao)
 // - Inclui gasto fixo por rodada a ser rateado por cada usuário (Custo)
 // ============================================================================
-// Version 1.2
-// - Inclui subadministrador
 
-$loteca_db_version = '1.2';
+$loteca_db_version = '1.3';
 
 function loteca_db_install(){
 	global $wpdb;
@@ -75,6 +78,7 @@ function loteca_db_install(){
 		qt_cotas smallint(6) NOT NULL COMMENT 'Quantidade de cotas padrão do participante',
 		id_ativo tinyint(1) NOT NULL COMMENT 'Indicador de participante ativo',
 		id_admin tinyint(1) NOT NULL COMMENT 'Indicador de participante com status de administrador',
+		id_excluido tinyint(1) NOT NULL DEFAULT 0 COMMENT 'Indica se o participante foi excluído',
 		PRIMARY KEY (id_grupo,id_user),
 		UNIQUE KEY `apelido` (id_grupo,apelido),
 	) $charset_collate ENGINE = INNODB COMMENT = 'Lista dos participantes do grupo de bolão';";
