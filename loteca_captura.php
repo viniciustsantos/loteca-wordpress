@@ -5,7 +5,7 @@ include_once 'loteca_geral.php';
 
 function busca_info_ult_rodada(){
 	$sql="SELECT rodada, dt_sorteio FROM `wp_loteca_rodada` where rodada = (select max(rodada) from  `wp_loteca_rodada`)";
-	$result=query($sql);
+	$result=query($sql, 'loteca_captura.php(busca_info_ult_rodada)');
 	while ($row = mysqli_fetch_assoc($result)) {
 		return $row;
 	}
@@ -38,6 +38,15 @@ function captura_programacao(){
 		$querys=array();
 		$resultados=$doc->getElementById('resultados');
 // CAPTURA INFORMAÇÃO DO CONCURSO
+		$estimado="0.0";
+		$possiveis_estimados=$resultados->getElementsByTagName('p');
+		foreach($possiveis_estimados as $possivel){
+			if($possivel->getAttribute('class')=="value"){
+				$retirar=array("R$ ",".");
+				$estimado=str_replace(',','.',str_replace($retirar,"",$possivel->nodeValue));
+			}
+		}
+		
 		$infos=$resultados->getElementsByTagName('small');
 		foreach($infos as $info){
 			$texto=$info->nodeValue;
@@ -49,9 +58,14 @@ function captura_programacao(){
 			$fim=date("Y-m-d",strtotime("previous friday", $dia));
 //			$dia_sql=DateTime::createFromFormat('Y-m-d', $array[1])->getTimestamp();
 			$dia_sql=date("Y-m-d",$dia);
-			$querys[]="
-			INSERT INTO wp_loteca_rodada ( rodada , dt_inicio_palpite , dt_fim_palpite , dt_sorteio ) 
-			VALUES ( " . $concurso ." , '" . $inicio . " 00:00:00' , '" . $fim . " 18:00:00' , '" . $dia_sql . "');\n";			
+			$sql="
+			INSERT INTO wp_loteca_rodada ( rodada , dt_inicio_palpite , dt_fim_palpite , dt_sorteio , vl_premio_estimado) 
+			VALUES ( " . $concurso ." , '" . $inicio . " 00:00:00' , '" . $fim . " 18:00:00' , '" . $dia_sql . " , " . $estimado . " ');\n";			
+			gr_l("INSERINDO NOVA RODADA: " . $sql);
+			$querys[]=$sql;
+//			$querys[]="
+//			INSERT INTO wp_loteca_rodada ( rodada , dt_inicio_palpite , dt_fim_palpite , dt_sorteio , vl_premio_estimado) 
+//			VALUES ( " . $concurso ." , '" . $inicio . " 00:00:00' , '" . $fim . " 18:00:00' , '" . $dia_sql . " , 0 ');\n";			
 			
 			$sabado=date("Y-m-d",strtotime("previous saturday", $dia));
 			$domingo=date("Y-m-d",strtotime("previous sunday", $dia));
@@ -106,7 +120,7 @@ function captura_programacao(){
 				VALUES (" . $concurso ." , " . $jogo['SEQ'] . " , '" . $jogo['TIME1'] . "' , '" . $jogo['TIME2'] . "' , '" . $jogo['DATA'] . "' , '" . $jogo['DIA'] . "' , '00:00:00' , '00:00:00' );\n";
 			}
 		}
-		query($querys);
+		query($querys, 'loteca_captura.php(captura_programacao)');
 	}
 	return TRUE;
 }
@@ -149,12 +163,12 @@ function captura_resultado_cef() {
 							default:
 								$erro=TRUE;
 						}
-						$querys[]="INSERT INTO `wp_loteca_resultado` VALUES (" . $concurso . " , " .  $chave . " , " . $time1 . " , " . $empate . " , " . $time2 . "); ";
+						$querys[]="INSERT INTO `wp_loteca_resultado` (rodada , seq , time1 , empate , time2 ) VALUES (" . $concurso . " , " .  $chave . " , " . $time1 . " , " . $empate . " , " . $time2 . "); ";
 					}
 				}
 				if(!$erro){
 					foreach($querys as $query){
-						query($query);
+						query($query, 'loteca_captura.php(captura_resultado_cef)');
 					}
 					echo 'Incluidas as informações de resultado\n';
 					return TRUE;
@@ -179,7 +193,7 @@ function captura_resultado_cef() {
 
 function busca_resultado_pendente(){
 	$sql="SELECT * FROM `wp_loteca_rodada` WHERE rodada not in (SELECT rodada from `wp_loteca_resultado`) and dt_sorteio <= CURRENT_DATE()";
-	$result=query($sql);
+	$result=query($sql, 'loteca_captura.php(busca_resultado_pendente)');
 	while ($row = mysqli_fetch_assoc($result)) {
 		return intval($row['rodada']);
 	}
